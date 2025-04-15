@@ -4,7 +4,7 @@ numpy==1.26.4
 pandas==2.2.3
 vaderSentiment==3.3.2
 transformers==4.44.2
-emoji==2.14.0
+emoji==1.7.0
 matplotlib==3.9.2
 seaborn==0.13.2
 spacy==3.7.6
