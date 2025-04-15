@@ -92,14 +92,15 @@ class LSTMCRFClassifier(nn.Module):
             return torch.tensor([d[0] for d in decoded], device=x.device)
 
 def emoji_to_words(text, emoji_to_word):
-    if not EMOJI_AVAILABLE:
-        # Fallback: return text as-is if emoji package is missing
-        return text
-    def replace_shortcode(match):
-        shortcode = match.group(1)
-        return emoji_to_word.get(f":{shortcode}:", shortcode)
-    text = re.sub(r':(\w+):', replace_shortcode, text)
-    return text
+    emoji = Emoji()
+    shortcoded = emoji.unicode_to_shortcode(text)
+    shortcoded = re.sub(r'(:\w+?:)', r' \1 ', shortcoded).strip()
+    parts = shortcoded.split()
+    result = []
+    for part in parts:
+        result.append(emoji_to_word.get(part, part))
+    temp_text = ' '.join(result)
+    return re.sub(r':(\w+):', r'\1', temp_text)
 
 def preprocess_text(text, tokenizer, bert_model, pca, emoji_to_word, final_dict):
     text = text.lower()
