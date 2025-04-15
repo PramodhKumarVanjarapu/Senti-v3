@@ -5,7 +5,6 @@ import json
 import pickle
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from transformers import BertTokenizer, BertModel, pipeline
-from emoji import shortcode_to_unicode, unicode_to_emoji
 import re
 import pandas as pd
 import torch.nn as nn
@@ -22,6 +21,15 @@ from scipy.stats import gaussian_kde
 from io import BytesIO
 import gdown
 import os
+import warnings
+
+# Try importing emoji, with fallback
+try:
+    from emoji import shortcode_to_unicode, unicode_to_emoji
+    EMOJI_AVAILABLE = True
+except ModuleNotFoundError:
+    warnings.warn("emoji package not found. Emoji processing will be limited.")
+    EMOJI_AVAILABLE = False
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -36,9 +44,11 @@ COLORS = {
 }
 
 # Google Drive file IDs for .pt files only
-file_ids = { "best_model.pt": "19yjwerxnJYX0ayjN8sVjmWBZ4JSzuX1i", 
-            "embeddings.pt": "1Ar2zIb6WXQ5eqgH3Vmfo4e9yjCqYgpL-", 
-            "full_model.pt": "1VFbKmBakfxglAOdYfU4xMKx9BeaazCDK" }
+GOOGLE_DRIVE_IDS = {
+    "best_model.pt": "YOUR_BEST_MODEL_FILE_ID",
+    "full_model.pt": "YOUR_FULL_MODEL_FILE_ID",
+    "embeddings.pt": "YOUR_EMBEDDINGS_FILE_ID"
+}
 
 # Download .pt files from Google Drive
 @st.cache_resource
@@ -88,6 +98,9 @@ class LSTMCRFClassifier(nn.Module):
             return torch.tensor([d[0] for d in decoded], device=x.device)
 
 def emoji_to_words(text, emoji_to_word):
+    if not EMOJI_AVAILABLE:
+        # Fallback: return text as-is if emoji package is missing
+        return text
     def replace_shortcode(match):
         shortcode = match.group(1)
         return emoji_to_word.get(f":{shortcode}:", shortcode)
@@ -165,7 +178,9 @@ def load_model_and_dependencies():
     return model, label_encoder, tokenizer, bert_model, pca, emoji_to_word, final_dict
 
 def get_sentiment_emoji(label):
-    return "😊" if label.lower() == "positive" else "😠" if label.lower() == "negative" else "😐"
+    if EMOJI_AVAILABLE:
+        return "😊" if label.lower() == "positive" else "😠" if label.lower() == "negative" else "😐"
+    return ""
 
 def load_language_model(text):
     try:
@@ -914,6 +929,13 @@ def main():
     st.set_page_config(page_title="Advanced Sentiment Analysis", page_icon="📊", layout="wide")
     st.sidebar.title("Sentiment Analysis Dashboard")
     st.sidebar.markdown("Analyze sentiments, aspects, or batch data with advanced visualizations.")
+    
+    # Verify Streamlit config
+    config_path = ".streamlit/config.toml"
+    if os.path.exists(config_path):
+        st.sidebar.success("Streamlit config loaded successfully.")
+    else:
+        st.sidebar.warning("Streamlit config (.streamlit/config.toml) not found. This may cause PyTorch errors.")
     
     plt.style.use('seaborn-v0_8-whitegrid')
     sns.set_context("notebook", font_scale=1.1)
