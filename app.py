@@ -23,13 +23,7 @@ import gdown
 import os
 import warnings
 
-# Try importing emoji, with fallback
-try:
-    from emoji import shortcode_to_unicode, unicode_to_emoji
-    EMOJI_AVAILABLE = True
-except ModuleNotFoundError:
-    warnings.warn("emoji package not found. Emoji processing will be limited.")
-    EMOJI_AVAILABLE = False
+from emojipy import Emoji
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
