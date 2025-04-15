@@ -5,7 +5,7 @@ import json
 import pickle
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from transformers import BertTokenizer, BertModel, pipeline
-from emojipy import Emoji
+from emoji import shortcode_to_unicode, unicode_to_emoji
 import re
 import pandas as pd
 import torch.nn as nn
@@ -17,22 +17,45 @@ from langdetect import detect
 from sklearn.metrics.pairwise import cosine_similarity
 from functools import lru_cache
 from wordcloud import WordCloud
-from torchcrf import CRF
+from pytorch_crf import CRF
 from scipy.stats import gaussian_kde
 from io import BytesIO
-from matplotlib.lines import Line2D
+import gdown
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Define consistent color palette
 COLORS = {
-    "positive": "#4CAF50",  # Green
-    "neutral": "#FFC107",   # Amber
-    "negative": "#F44336",  # Red
-    "primary": "#2196F3",   # Blue
-    "secondary": "#9C27B0", # Purple
-    "accent": "#FF9800"     # Orange
+    "positive": "#4CAF50",
+    "neutral": "#FFC107",
+    "negative": "#F44336",
+    "primary": "#2196F3",
+    "secondary": "#9C27B0",
+    "accent": "#FF9800"
 }
+
+# Google Drive file IDs for .pt files only
+GOOGLE_DRIVE_IDS = {
+    "best_model.pt": "YOUR_BEST_MODEL_FILE_ID",
+    "full_model.pt": "YOUR_FULL_MODEL_FILE_ID",
+    "embeddings.pt": "YOUR_EMBEDDINGS_FILE_ID"
+}
+
+# Download .pt files from Google Drive
+@st.cache_resource
+def download_from_google_drive():
+    with st.spinner("Downloading models from Google Drive..."):
+        for file_name, file_id in GOOGLE_DRIVE_IDS.items():
+            if not os.path.exists(file_name):
+                try:
+                    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+                    gdown.download(url, file_name, quiet=False)
+                    st.success(f"Downloaded {file_name}")
+                except Exception as e:
+                    st.error(f"Failed to download {file_name}: {str(e)}")
+                    raise
+    return True
 
 # LSTMCRFClassifier
 class LSTMCRFClassifier(nn.Module):
@@ -67,15 +90,11 @@ class LSTMCRFClassifier(nn.Module):
             return torch.tensor([d[0] for d in decoded], device=x.device)
 
 def emoji_to_words(text, emoji_to_word):
-    emoji = Emoji()
-    shortcoded = emoji.unicode_to_shortcode(text)
-    shortcoded = re.sub(r'(:\w+?:)', r' \1 ', shortcoded).strip()
-    parts = shortcoded.split()
-    result = []
-    for part in parts:
-        result.append(emoji_to_word.get(part, part))
-    temp_text = ' '.join(result)
-    return re.sub(r':(\w+):', r'\1', temp_text)
+    def replace_shortcode(match):
+        shortcode = match.group(1)
+        return emoji_to_word.get(f":{shortcode}:", shortcode)
+    text = re.sub(r':(\w+):', replace_shortcode, text)
+    return text
 
 def preprocess_text(text, tokenizer, bert_model, pca, emoji_to_word, final_dict):
     text = text.lower()
@@ -110,6 +129,16 @@ def classify_sentence(text, model, label_encoder, tokenizer, bert_model, pca, em
     return predicted_label, confidence, probs
 
 def load_model_and_dependencies():
+    # Download .pt files
+    download_from_google_drive()
+
+    # Load local files
+    local_files = ['pca_model.pkl', 'label_encoder.pkl', 'final_acronyms.json', 'emojis_config.json']
+    for file_name in local_files:
+        if not os.path.exists(file_name):
+            st.error(f"Required file {file_name} not found in repository.")
+            raise FileNotFoundError(f"{file_name} missing")
+
     with open('pca_model.pkl', 'rb') as f:
         pca = pickle.load(f)
     with open("final_acronyms.json", "r") as file:
@@ -147,6 +176,7 @@ def load_language_model(text):
         try:
             return spacy.load(model_name)
         except OSError:
+            spacy.cli.download("en_core_web_sm")
             return spacy.load("en_core_web_sm")
     except:
         return spacy.load("en_core_web_sm")
@@ -295,11 +325,8 @@ def generate_sentiment_visualizations(label, confidence, probs, vader_scores, wo
     tab.subheader("Overall Sentiment Analysis")
     
     col1, col2, col3 = tab.columns(3)
-
-    # Ensure label is lowercase for COLORS dictionary
     label = label.lower()
 
-    # Line Chart for VADER Sentiment Scores
     fig1, ax1 = plt.subplots(figsize=(4, 3))
     sentiment_types = ["Positive", "Neutral", "Negative", "Compound"]
     scores = [vader_scores["pos"], vader_scores["neu"], vader_scores["neg"], vader_scores["compound"]]
@@ -313,7 +340,6 @@ def generate_sentiment_visualizations(label, confidence, probs, vader_scores, wo
     col1.pyplot(fig1)
     plt.close()
 
-    # Word-Level Sentiment Heatmap
     if not word_sentiments_df.empty:
         fig2, ax2 = plt.subplots(figsize=(6, 4))
         pivot_df = word_sentiments_df.pivot_table(
@@ -338,7 +364,6 @@ def generate_sentiment_visualizations(label, confidence, probs, vader_scores, wo
             col2.pyplot(fig2)
             plt.close()
 
-    # Pie Chart for VADER Sentiment Distribution
     fig3, ax3 = plt.subplots(figsize=(4, 3))
     pie_labels = ["Positive", "Neutral", "Negative"]
     pie_scores = [vader_scores["pos"], vader_scores["neu"], vader_scores["neg"]]
@@ -356,13 +381,11 @@ def generate_sentiment_visualizations(label, confidence, probs, vader_scores, wo
     col3.pyplot(fig3)
     plt.close()
 
-    # Display Word-Level Sentiment Table
     if not word_sentiments_df.empty:
         tab.subheader("Word-Level Sentiment Analysis")
         tab.markdown("Sentiment scores for significant words (nouns, adjectives, verbs, adverbs).")
         tab.dataframe(word_sentiments_df[["Word", "Compound", "Positive", "Negative", "Neutral"]])
         
-        # Download Word-Level Data
         csv = word_sentiments_df.to_csv(index=False)
         tab.download_button(
             label="Download Word-Level Sentiment as CSV",
@@ -372,7 +395,6 @@ def generate_sentiment_visualizations(label, confidence, probs, vader_scores, wo
         )
 
 def create_downloadable_plots(filtered_df, word_sentiments_df, tab, key_suffix, chart_options):
-    """Create downloadable high-quality plots"""
     plt.rcParams['savefig.dpi'] = 300
     plt.rcParams['figure.dpi'] = 150
     
@@ -920,11 +942,9 @@ def main():
                 analyzer = SentimentIntensityAnalyzer()
                 vader_scores = analyzer.polarity_scores(text_input)
                 word_sentiments_df = get_word_level_sentiment(text_input)
-                # Attach vader_scores to filtered_df for downloadable plots
                 filtered_df = pd.DataFrame([{"Sentiment": label, "Confidence": confidence}])
                 filtered_df.vader_scores = vader_scores
                 
-                # Display Overall Sentiment
                 tab1.subheader("Overall Sentiment")
                 sentiment_emoji = get_sentiment_emoji(label)
                 tab1.metric(
@@ -933,7 +953,6 @@ def main():
                     delta=f"Confidence: {confidence:.2%}"
                 )
                 
-                # Generate Word Cloud
                 if not word_sentiments_df.empty:
                     tab1.subheader("Word Cloud Visualization")
                     sentiment_weights = word_sentiments_df.set_index("Word")["Compound"].to_dict()
@@ -947,7 +966,6 @@ def main():
                         else:
                             return COLORS["neutral"]
                     
-                    # Create word cloud text based on word frequency
                     word_freq = word_sentiments_df["Word"].value_counts().to_dict()
                     wordcloud_text = " ".join([word + " " * min(int(freq * 10), 50) for word, freq in word_freq.items()])
                     
@@ -972,7 +990,6 @@ def main():
                 
                 generate_sentiment_visualizations(label, confidence, probs, vader_scores, word_sentiments_df, tab1)
                 
-                # Add visualization options for downloadable plots
                 tab1.subheader("Visualization Options")
                 chart_options = tab1.multiselect(
                     "Select which visualizations to show:",
