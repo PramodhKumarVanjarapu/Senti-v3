@@ -16,7 +16,7 @@ from langdetect import detect
 from sklearn.metrics.pairwise import cosine_similarity
 from functools import lru_cache
 from wordcloud import WordCloud
-from pytorch_crf import CRF
+from torchcrf import CRF
 from scipy.stats import gaussian_kde
 from io import BytesIO
 import gdown
