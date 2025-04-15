@@ -172,10 +172,9 @@ def load_model_and_dependencies():
         model.eval()
     return model, label_encoder, tokenizer, bert_model, pca, emoji_to_word, final_dict
 
+
 def get_sentiment_emoji(label):
-    if EMOJI_AVAILABLE:
-        return "😊" if label.lower() == "positive" else "😠" if label.lower() == "negative" else "😐"
-    return ""
+    return "😊" if label.lower() == "positive" else "😠" if label.lower() == "negative" else "😐"
 
 def load_language_model(text):
     try:
