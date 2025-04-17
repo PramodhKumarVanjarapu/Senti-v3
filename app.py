@@ -38,11 +38,9 @@ COLORS = {
 }
 
 # Google Drive file IDs for .pt files only
-GOOGLE_DRIVE_IDS = {
-    "best_model.pt": "YOUR_BEST_MODEL_FILE_ID",
-    "full_model.pt": "YOUR_FULL_MODEL_FILE_ID",
-    "embeddings.pt": "YOUR_EMBEDDINGS_FILE_ID"
-}
+GOOGLE_DRIVE_IDS = { "best_model.pt": "19yjwerxnJYX0ayjN8sVjmWBZ4JSzuX1i", 
+             "embeddings.pt": "1Ar2zIb6WXQ5eqgH3Vmfo4e9yjCqYgpL-", 
+             "full_model.pt": "1VFbKmBakfxglAOdYfU4xMKx9BeaazCDK" }
 
 # Download .pt files from Google Drive
 @st.cache_resource
