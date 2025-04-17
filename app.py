@@ -57,6 +57,9 @@ def download_from_google_drive():
                     raise
     return True
 
+
+download_from_google_drive()
+
 # LSTMCRFClassifier
 class LSTMCRFClassifier(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes, num_layers=2, dropout=0.6, bidirectional=True):
